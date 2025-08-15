@@ -159,9 +159,14 @@ void FCLNeuron::doLearning() {
 		assert((inputs+i) == inputsp);
 		assert((weightChange+i) == weightschp);
 		if (*maskp) {
-			*weightschp = momentum * (*weightschp) +
-				(*inputsp) * error * learningRate * learningRateFactor -
-				(*weightsp) * decay * learningRate * fabs(error);
+			// *weightschp = momentum * (*weightschp) +
+			// 	(*inputsp) * error * learningRate * learningRateFactor -
+			// 	(*weightsp) * decay * learningRate * fabs(error);
+			
+			// The following weight change is based on Oja's rule and eliminates deviation in weights after learning.
+			// But abs(error) is higher than 0.001.
+			*weightschp = learningRate*((*inputsp)*error - output*output*(*weightsp));
+			
 			*weightsp = *weightsp + *weightschp;
 #ifdef DEBUG
 			if (isnan(sum) || isnan(weights[i]) || isnan(inputs[i]) || (fabs(sum)>SUM_ERR_THRES)) {
