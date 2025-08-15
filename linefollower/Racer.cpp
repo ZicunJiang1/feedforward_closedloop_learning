@@ -47,6 +47,15 @@ namespace Enki
 			addLocalInteraction(groundSensorArray[i+nSensors/2]);
 		}
 		
-		setRectangular(20,10,5,80);
+		// Set triangular prism shape
+		Enki::Polygon p;
+		p.push_back(Point(10,0));
+		p.push_back(Point(-10,5));
+		p.push_back(Point(-10,-5));
+		PhysicalObject::Hull hull(Enki::PhysicalObject::Part(p, 5));
+		setCustomHull(hull, 80);
+
+		// Set rectangular shape
+		// setRectangular(20,10,5,80);
 	}
 }

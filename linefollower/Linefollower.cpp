@@ -28,6 +28,9 @@ protected:
 
 	FILE* fcoord = NULL;
 	
+	// Log file storing when the robot is turning.
+	FILE* turnslog = NULL;
+
 	int learningOff = 1;
 
 	long step = 0;
@@ -39,11 +42,12 @@ protected:
 	int trackCompletedCtr = 5000;
 		
 public:
-	LineFollower(World *world, QWidget *parent = 0) :
+	LineFollower(World *world, QWidget *parent = 0, int seed=42) :
 		ViewerWidget(world, parent) {
 
 		flog = fopen("flog.tsv","wt");
 		fcoord = fopen("coord.tsv","wt");
+		turnslog = fopen("turnslog.tsv", "wt");
 
 		// setting up the robot
 		racer = new Racer(nInputs);
@@ -64,6 +68,7 @@ public:
 			minT,
 			maxT);
 
+		fcl->seedRandom(seed);
 		fcl->initWeights(1,0,FCLNeuron::MAX_OUTPUT_RANDOM);
 		fcl->setLearningRate(learningRate);
 		fcl->setLearningRateDiscountFactor(1);
@@ -75,6 +80,7 @@ public:
 	~LineFollower() {
 		fclose(flog);
 		fclose(fcoord);
+		fclose(turnslog);
 		delete fcl;
 	}
 
@@ -113,14 +119,22 @@ public:
 		if (racer->pos.x < border) {
 			racer->angle = 0;
 			trackCompletedCtr = STEPS_OFF_TRACK;
+			fprintf(turnslog, "%d\n", 1); // log 1 when turning.
 		}
+		else {
+			fprintf(turnslog, "%d\n", 0); // log 0 when on track or not turning.
+		}
+		fflush(turnslog);
 		trackCompletedCtr--;
 		if (trackCompletedCtr < 1) {
 			// been off the track for a long time!
+			fprintf(stderr, "Quitting because off track for too long.\n");
 			step = MAX_STEPS;
 			qApp->quit();
 		}
 		fprintf(stderr,"%d ",learningOff);
+
+		// Keep learning turned off if bumped into wall.
 		if (learningOff>0) {
 			fcl->setLearningRate(0);
 			learningOff--;
@@ -138,7 +152,7 @@ public:
 		double error = (leftGround+leftGround2*2)-(rightGround+rightGround2*2);
 		for(auto &e:err) {
 			e = error;
-                }
+		}
 		// !!!!
 		fcl->doStep(pred,err);
 		float vL = (float)((fcl->getOutputLayer()->getNeuron(0)->getOutput())*50 +
@@ -159,8 +173,9 @@ public:
 		// documenting
 		// if the learning is off we set the error to zero which
 		// happens on the edges when the robot is turned violently around
-		if (learningOff) error = 0;
-       		avgError = avgError + (error - avgError)*avgErrorDecay;
+		if (learningOff)
+			error = 0;
+		avgError = avgError + (error - avgError)*avgErrorDecay;
 		double absError = fabs(avgError);
 		if (absError > SQ_ERROR_THRES) {
 			successCtr = 0;
@@ -168,14 +183,18 @@ public:
 			successCtr++;
 		}
 		if (successCtr>STEPS_BELOW_ERR_THRESHOLD) {
+			fprintf(stderr, "Quitting because error has been below threshold for at least STEPS_BELOW_ERR_THRESHOLD steps\n");
 			qApp->quit();
 		}
 		if (step>MAX_STEPS) {
+			fprintf(stderr, "Quitting because step exceeded MAX_STEPS.\n");
 			qApp->quit();
 		}
-		
+
+		// Logs error, avg_error, absError, vL, vR, layer1WeightDist, ..., layerNWeightDist
 		fprintf(flog,"%e\t",error);
 		fprintf(flog,"%e\t",avgError);
+		fprintf(flog,"%e\t",absError);
 		fprintf(flog,"%e\t%e",vL,vR);
 		for(int i=0;i<fcl->getNumLayers();i++) {
 			fprintf(flog,"\t%e",fcl->getLayer(i)->getWeightDistanceFromInitialWeights());
@@ -212,6 +231,9 @@ void singleRun(int argc,
 	World world(maxx, maxy,
 		    Color(1000, 1000, 100),
 		    World::GroundTexture(loopImage.width(), loopImage.height(), bitmap));
+	// Set random seed for world.
+	world.setRandomSeed(42);
+	srand(42);
 	LineFollower linefollower(&world);
 	linefollower.setLearningRate(learningrate);
 	linefollower.show();

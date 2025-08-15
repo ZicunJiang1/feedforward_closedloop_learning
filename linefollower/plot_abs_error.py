@@ -33,7 +33,19 @@ class RealtimePlotWindow:
 
 
 # Create an instance of an animated scrolling window
-realtimePlotWindow = RealtimePlotWindow("llog.tsv",2)
+
+column_idx_map = {
+    'unamplified_error': 0,
+    'average_error':1,
+    'absolute_error':2,
+    'left_steering_velocity':3,
+    'right_steering_velocity':4,
+    'layer_1_wt_dist':4,
+    'layer_2_wt_dist':5,
+    'layer_3_wt_dist':6
+}
+
+realtimePlotWindow = RealtimePlotWindow("flog.tsv",column_idx_map['absolute_error'])
 
 # show the plot and start the animation
 plt.show()

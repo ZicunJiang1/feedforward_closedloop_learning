@@ -114,7 +114,7 @@ set cbtics  norangelimit autofreq
 set rtics axis in scale 1,0.5 nomirror norotate  autojustify
 set rtics  norangelimit autofreq 
 unset ttics
-set title "" 
+set title "Weight distance v/s Time" 
 set title  font "" textcolor lt -1 norotate
 set timestamp bottom 
 set timestamp "" 
@@ -122,13 +122,13 @@ set timestamp  font "" textcolor lt -1 norotate
 set trange [ * : * ] noreverse nowriteback
 set urange [ * : * ] noreverse nowriteback
 set vrange [ * : * ] noreverse nowriteback
-set xlabel "" 
+set xlabel "Time (steps)"
 set xlabel  font "" textcolor lt -1 norotate
 set x2label "" 
 set x2label  font "" textcolor lt -1 norotate
 set xrange [ * : * ] noreverse writeback
 set x2range [ * : * ] noreverse writeback
-set ylabel "" 
+set ylabel "Weight distance (unit)" 
 set ylabel  font "" textcolor lt -1 rotate
 set y2label "" 
 set y2label  font "" textcolor lt -1 rotate
@@ -165,8 +165,9 @@ set fontpath
 set psdir
 set fit brief errorvariables nocovariancevariables errorscaling prescale nowrap v5
 GNUTERM = "wxt"
-## Last datafile plotted: "flog.tsv"
-plot "flog.tsv" using 4 w l, "flog.tsv" using 5 w l, "flog.tsv" using 6 w l
+# Last datafile plotted: "flog.tsv"
+# Columns(indexing starts at 1) are 1:error, 2:avg_error, 3: absError, 4:vL, 5:vR, 6:layer1WeightDist, 7:layer2WeightDist, 8:layer3WeightDist
+plot "flog.tsv" using 6 w l title 'input layer', "flog.tsv" using 7 w l title 'first hidden layer', "flog.tsv" using 8 w l title 'output layer'
 #    EOF
 pause(-1)
 

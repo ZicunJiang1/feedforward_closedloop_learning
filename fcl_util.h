@@ -7,6 +7,8 @@
 #include "fcl/bandpass.h"
 #include "fcl.h"
 
+#include "logger/network_logger.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -68,6 +70,7 @@ private:
 	std::vector<double> filterbankOutputs;
 	int nFiltersPerInput = 0;
 	int nInputs = 0;
+	NetworkLogger* networkLogger = NULL;
 };
 
 #endif

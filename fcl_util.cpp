@@ -1,4 +1,5 @@
 #include "fcl_util.h"
+#include "logger/network_logger.h"
 #include <math.h>
 
 /**
@@ -26,6 +27,12 @@ FeedforwardClosedloopLearningWithFilterbank::FeedforwardClosedloopLearningWithFi
 	bandpass = new FCLBandpass**[num_of_inputs];
 	errors.resize(num_of_inputs*num_filtersInput);
 	filterbankOutputs.resize(num_of_inputs * num_filtersInput);
+
+#ifdef DEBUG
+	networkLogger = new NetworkLogger(this);
+	networkLogger->log();
+#endif
+
 	for(int i=0;i<num_of_inputs;i++) {
 		bandpass[i] = new FCLBandpass*[num_filtersInput];
 		double fs = 1;
@@ -93,6 +100,9 @@ void FeedforwardClosedloopLearningWithFilterbank::doStep(const std::vector<doubl
 		#endif
 		throw tmp;
 	}
+#ifdef DEBUG
+	networkLogger->logLayers();
+#endif
 	for(int i=0;i<nInputs;i++) {
 		for(int j=0;j<nFiltersPerInput;j++) {
 			filterbankOutputs[i*nFiltersPerInput+j] = bandpass[i][j]->filter(input[i]);

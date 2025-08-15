@@ -34,6 +34,9 @@ set(LIBSRC
   fcl/layer.cpp
   fcl.cpp
   fcl_util.cpp
+  logger/logger.cpp
+  logger/layer_logger.cpp
+  logger/network_logger.cpp
   )
 
 set(PUBLICHEADERS
@@ -46,6 +49,9 @@ set(PRIVATEHEADERS
   fcl/bandpass.h
   fcl/layer.h
   fcl/globals.h
+  logger/logger.h
+  logger/layer_logger.h
+  logger/network_logger.h
   )
   
 
