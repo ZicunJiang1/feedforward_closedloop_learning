@@ -2,7 +2,7 @@
 #define NETWORK_LOGGER_H
 
 #include "layer_logger.h"
-#include "fcl.h"
+#include "../fcl.h"
 #include <iostream>
 
 class NetworkLogger : public Logger
