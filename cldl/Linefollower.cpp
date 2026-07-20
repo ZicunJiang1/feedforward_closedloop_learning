@@ -7,7 +7,7 @@
 using namespace Enki;
 using namespace std;
 
-#include "../Linefollower.h"
+#include "Linefollower.h"
 
 class LineFollower : public ViewerWidget {
 protected:

@@ -75,10 +75,14 @@ set_target_properties(cldl_static PROPERTIES
 
 add_executable(linefollowercldl
   Linefollower.cpp
-  ../Racer.cpp
+  ../linefollower/Racer.cpp
   )
 
-target_include_directories(linefollowercldl PUBLIC ${PROJECT_SOURCE_DIR} ..)
+target_include_directories(linefollowercldl PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_SOURCE_DIR}
+  ${CMAKE_SOURCE_DIR}/linefollower 
+)
 
 target_link_libraries(linefollowercldl
   enkiviewer

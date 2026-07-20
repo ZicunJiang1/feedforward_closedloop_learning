@@ -23,7 +23,7 @@ find_package(OpenGL REQUIRED)
 include_directories(${GLUT_INCLUDE_DIR})
 include_directories(${OpenGL_INCLUDE_DIRS})
 
-add_subdirectory(cldl)
+# add_subdirectory(cldl)
 
 add_executable(linefollower
   Linefollower.cpp

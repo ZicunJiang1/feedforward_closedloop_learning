@@ -26,6 +26,7 @@ find_package(OpenGL)
 
 if(Qt5_FOUND AND OPENGL_FOUND)
   add_subdirectory(linefollower)
+  add_subdirectory(cldl)
 endif()
 
 set(LIBSRC
