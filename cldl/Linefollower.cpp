@@ -133,7 +133,7 @@ public:
 			//if (i>=racer->getNsensors()/2) fprintf(stderr,"%e ",pred[i]);
 		}
 		double error = (leftGround+leftGround2*2)-(rightGround+rightGround2*2);
-		for(int i=0;i<nNeuronsInLayers[0];i++) {
+		for(int i=0;i<nNeuronsInLayers[2];i++) {
 			err[i] = error;
                 }
 		// !!!!
