@@ -339,7 +339,7 @@ int main(int argc, char *argv[]) {
         singleRun(
             argc,
             argv,
-            0.00025f,
+            0.008f,
             seed,
             outputDirectory);
         break;
