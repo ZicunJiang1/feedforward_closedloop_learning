@@ -4,6 +4,9 @@
 #include "cldl_filterbank.h"
 #include <viewer/Viewer.h>
 
+#include <cstdlib>
+#include <string>
+
 using namespace Enki;
 using namespace std;
 
@@ -25,6 +28,7 @@ protected:
 	FILE* flog = NULL;
 
 	FILE* fcoord = NULL;
+	std::string outputDirectory;
 
 	int learningOff = 1;
 
@@ -37,11 +41,26 @@ protected:
 	int trackCompletedCtr = 5000;
 		
 public:
-	LineFollower(World *world, QWidget *parent = 0) :
-		ViewerWidget(world, parent) {
+	LineFollower(World *world, QWidget *parent = 0, int seed = 42, const std::string& outputDir = ".") :
+		ViewerWidget(world, parent), outputDirectory(outputDir) {
 
-		flog = fopen("flog.tsv","wt");
-		fcoord = fopen("coord.tsv","wt");
+		srand(static_cast<unsigned int>(seed));
+		srandom(static_cast<unsigned int>(seed));
+
+		const std::string flogPath =
+    		outputDirectory + "/flog.tsv";
+		const std::string coordPath =
+    		outputDirectory + "/coord.tsv";
+
+		flog = fopen(flogPath.c_str(), "wt");
+		fcoord = fopen(coordPath.c_str(), "wt");
+
+		if (!flog || !fcoord) {
+   			fprintf(stderr,
+            	"Failed to open CLDL output files in %s\n",
+            	outputDirectory.c_str());
+    		exit(1);
+		}
 
 		// setting up the robot
 		racer = new Racer(nInputs);
@@ -182,8 +201,8 @@ public:
 		fflush(flog);
 		if ((step%100)==0) {
 			for(int i=0;i<cldl->getnLayers();i++) {
-				char tmp[256];
-				sprintf(tmp,"layer%d.dat",i);
+				char tmp[512];
+				snprintf(tmp,sizeof(tmp),"%s/layer%d.dat",outputDirectory.c_str(),i);
 				cldl->getLayer(i)->snapWeights(tmp);
 			}
 		}
@@ -197,6 +216,8 @@ public:
 void singleRun(int argc,
 	       char *argv[],
 	       float learningrate,
+		   int seed,
+		   const std::string& outputDirectory,
 	       FILE* f = NULL) {
 	QApplication app(argc, argv);
 	QString filename("loop.png");
@@ -210,7 +231,14 @@ void singleRun(int argc,
 	World world(maxx, maxy,
 		    Color(1000, 1000, 100),
 		    World::GroundTexture(loopImage.width(), loopImage.height(), bitmap));
-	LineFollower linefollower(&world);
+	world.setRandomSeed(seed);
+	srand(static_cast<unsigned int>(seed));
+	srandom(static_cast<unsigned int>(seed));
+	LineFollower linefollower(
+    	&world,
+    	nullptr,
+    	seed,
+    	outputDirectory);
 	linefollower.setLearningRate(learningrate);
 	linefollower.show();
 	app.exec();
@@ -225,11 +253,11 @@ void statsRun(int argc,
 	      char *argv[]) {
 	FILE* f = fopen("stats.dat","wt");
 	for(float learningRate = 0.00001f; learningRate < 0.1; learningRate = learningRate * 1.25f) {
-		srandom(1);
-		singleRun(argc,argv,learningRate,f);
+	//	srandom(1);
+		singleRun(argc,argv,learningRate,1,".",f);
 		fflush(f);
-		srandom(42);
-		singleRun(argc,argv,learningRate,f);
+	//	srandom(42);
+		singleRun(argc,argv,learningRate,42,".",f);
 		fflush(f);
 	}
 	fclose(f);
@@ -237,21 +265,52 @@ void statsRun(int argc,
 
 
 int main(int argc, char *argv[]) {
-	int n = 0;
-	if (argc>1) {
-		n = atoi(argv[1]);
-	} else {
-		fprintf(stderr,"Single run: %s 0\n",argv[0]);
-		fprintf(stderr,"Stats run: %s 1\n",argv[0]);
-		return 0;
-	}
-	switch (n) {
-	case 0:
-		singleRun(argc,argv,0.025f);
-		break;
-	case 1:
-		statsRun(argc,argv);
-		break;
-	}
-	return 0;
+    if (argc < 2) {
+        fprintf(stderr,
+                "Single run: %s 0 [seed] [output_directory]\n",
+                argv[0]);
+        fprintf(stderr,
+                "Stats run: %s 1\n",
+                argv[0]);
+        return 0;
+    }
+
+    const int mode = atoi(argv[1]);
+
+    int seed = 42;
+    if (argc > 2) {
+        seed = atoi(argv[2]);
+    }
+
+    std::string outputDirectory = ".";
+    if (argc > 3) {
+        outputDirectory = argv[3];
+    }
+
+    switch (mode) {
+    case 0:
+        fprintf(
+            stderr,
+            "Starting CLDL single run: seed=%d, output=%s\n",
+            seed,
+            outputDirectory.c_str());
+
+        singleRun(
+            argc,
+            argv,
+            0.025f,
+            seed,
+            outputDirectory);
+        break;
+
+    case 1:
+        statsRun(argc, argv);
+        break;
+
+    default:
+        fprintf(stderr, "Unknown mode: %d\n", mode);
+        return 1;
+    }
+
+    return 0;
 }

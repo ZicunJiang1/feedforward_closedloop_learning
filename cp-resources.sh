@@ -10,3 +10,5 @@ cp linefollower/loop.png build/cldl
 cp linefollower/plotweights.py build/cldl
 cp linefollower/plot_abs_error.py build/cldl
 cp linefollower/plot_weight_distance.plt build/cldl
+
+cp linefollower/loop.png build
