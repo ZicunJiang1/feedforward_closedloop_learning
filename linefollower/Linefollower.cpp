@@ -9,6 +9,12 @@
 #include <cstdlib>
 #include <string>
 
+#include <sstream>
+#include <vector>
+#include <cerrno>
+#include <climits>
+#include <cmath>
+
 using namespace Enki;
 using namespace std;
 
@@ -46,7 +52,7 @@ protected:
 	int trackCompletedCtr = 5000;
 		
 public:
-	LineFollower(World *world, QWidget *parent = 0, int seed=42, const std::string& outputDir = ".") :
+	LineFollower(World *world, QWidget *parent, int seed, const std::vector<int>& layers, const std::string& outputDir = ".") :
 		ViewerWidget(world, parent), outputDirectory(outputDir) {
 
 		const std::string flogPath =
@@ -81,7 +87,7 @@ public:
 		// setting up deep feedforward learning
 		fcl = new FeedforwardClosedloopLearningWithFilterbank(
 			nInputs,
-			nNeuronsInLayers,
+			layers,
 			nFiltersInput,
 			minT,
 			maxT);
@@ -240,8 +246,9 @@ public:
 
 void singleRun(int argc,
 	       char *argv[],
-	       float learningrate,
+	       double learningrate,
 		   int seed,
+		   const std::vector<int>& layers,
     	   const std::string& outputDirectory,
 	       FILE* f = NULL) {
 	QApplication app(argc, argv);
@@ -265,6 +272,7 @@ void singleRun(int argc,
     	&world,
     	nullptr,
     	seed,
+		layers,
     	outputDirectory);
 	linefollower.setLearningRate(learningrate);
 	linefollower.show();
@@ -276,82 +284,270 @@ void singleRun(int argc,
 }
 
 
-void statsRun(int argc,
-	      char *argv[]) {
-	FILE* f = fopen("stats.dat","wt");
-	for (float learningRate = 0.00001f;
-    	learningRate < 0.1;
-    	learningRate = learningRate * 1.25f) {
+void statsRun(
+    int argc,
+    char* argv[])
+{
+    FILE* f = fopen(
+        "stats.dat",
+        "wt");
 
-    	singleRun(
-        	argc,
-        	argv,
-        	learningRate,
-        	1,
-        	".",
-        	f);
-    	fflush(f);
+    if (!f) {
+        fprintf(
+            stderr,
+            "Failed to open stats.dat\n");
 
-    	singleRun(
-        	argc,
-        	argv,
-        	learningRate,
-        	42,
-        	".",
-        	f);
-    	fflush(f);
-	}
-	fclose(f);
+        return;
+    }
+
+    fprintf(
+        f,
+        "learning_rate\tseed\tsteps\tavg_error\n");
+
+    const std::vector<int> defaultLayers = {
+        9,
+        6,
+        6
+    };
+
+    for (double learningRate = 0.00001;
+         learningRate < 0.1;
+         learningRate *= 1.25) {
+
+        singleRun(
+            argc,
+            argv,
+            learningRate,
+            1,
+            defaultLayers,
+            ".",
+            f);
+
+        fflush(f);
+
+        singleRun(
+            argc,
+            argv,
+            learningRate,
+            42,
+            defaultLayers,
+            ".",
+            f);
+
+        fflush(f);
+    }
+
+    fclose(f);
 }
 
+bool parseLayerVector(
+    const std::string& text,
+    std::vector<int>& layers)
+{
+    layers.clear();
 
-int main(int argc, char *argv[]) {
+    std::stringstream stream(text);
+    std::string token;
+
+    while (std::getline(stream, token, ',')) {
+        if (token.empty()) {
+            return false;
+        }
+
+        char* end = nullptr;
+        errno = 0;
+
+        const long value = std::strtol(
+            token.c_str(),
+            &end,
+            10);
+
+        if (errno != 0 ||
+            end == token.c_str() ||
+            *end != '\0' ||
+            value <= 0 ||
+            value > INT_MAX) {
+            return false;
+        }
+
+        layers.push_back(static_cast<int>(value));
+    }
+
+    if (layers.empty()) {
+        return false;
+    }
+
+    if (layers.back() != 6) {
+        fprintf(
+            stderr,
+            "The output layer must contain exactly 6 neurons.\n");
+
+        return false;
+    }
+
+    return true;
+}
+
+bool parseDouble(
+    const char* text,
+    double& value)
+{
+    char* end = nullptr;
+    errno = 0;
+
+    value = std::strtod(text, &end);
+
+    if (errno != 0 ||
+        end == text ||
+        *end != '\0' ||
+        !std::isfinite(value)) {
+        return false;
+    }
+
+    return true;
+}
+
+bool parseInt(
+    const char* text,
+    int& value)
+{
+    char* end = nullptr;
+    errno = 0;
+
+    const long parsed = std::strtol(
+        text,
+        &end,
+        10);
+
+    if (errno != 0 ||
+        end == text ||
+        *end != '\0' ||
+        parsed < INT_MIN ||
+        parsed > INT_MAX) {
+        return false;
+    }
+
+    value = static_cast<int>(parsed);
+    return true;
+}
+
+int main(int argc, char* argv[])
+{
     if (argc < 2) {
-        fprintf(stderr,
-                "Single run: %s 0 [seed] [output_directory]\n",
-                argv[0]);
-        fprintf(stderr,
-                "Stats run: %s 1\n",
-                argv[0]);
-        return 0;
+        fprintf(
+            stderr,
+            "Usage:\n"
+            "  Single run:\n"
+            "    %s 0 <learning_rate> <seed> <layers> "
+            "[output_directory]\n"
+            "\n"
+            "  Example:\n"
+            "    %s 0 0.0008 42 9,6,6 DataFCL\n"
+            "\n"
+            "  Stats run:\n"
+            "    %s 1\n",
+            argv[0],
+            argv[0],
+            argv[0]);
+
+        return 1;
     }
 
-    const int mode = atoi(argv[1]);
+    int mode = 0;
 
-    int seed = 42;
-    if (argc > 2) {
-        seed = atoi(argv[2]);
-    }
+    if (!parseInt(argv[1], mode)) {
+        fprintf(
+            stderr,
+            "Invalid mode: %s\n",
+            argv[1]);
 
-    std::string outputDirectory = ".";
-    if (argc > 3) {
-        outputDirectory = argv[3];
+        return 1;
     }
 
     switch (mode) {
-    case 0:
+    case 0: {
+        if (argc < 5 || argc > 6) {
+            fprintf(
+                stderr,
+                "Usage: %s 0 <learning_rate> <seed> "
+                "<layers> [output_directory]\n",
+                argv[0]);
+
+            return 1;
+        }
+
+        double learningRate = 0.0;
+
+        if (!parseDouble(argv[2], learningRate) ||
+            learningRate <= 0.0) {
+            fprintf(
+                stderr,
+                "Invalid learning rate: %s\n",
+                argv[2]);
+
+            return 1;
+        }
+
+        int seed = 0;
+
+        if (!parseInt(argv[3], seed)) {
+            fprintf(
+                stderr,
+                "Invalid seed: %s\n",
+                argv[3]);
+
+            return 1;
+        }
+
+        std::vector<int> layers;
+
+        if (!parseLayerVector(argv[4], layers)) {
+            fprintf(
+                stderr,
+                "Invalid layer vector: %s\n"
+                "Expected format such as 9,6,6. "
+                "The final layer must contain 6 neurons.\n",
+                argv[4]);
+
+            return 1;
+        }
+
+        const std::string outputDirectory =
+            argc == 6 ? argv[5] : ".";
+
         fprintf(
             stderr,
-            "Starting FCL single run: seed=%d, output=%s\n",
+            "Starting FCL single run:\n"
+            "  learning rate: %.17g\n"
+            "  seed: %d\n"
+            "  layers: %s\n"
+            "  output: %s\n",
+            learningRate,
             seed,
+            argv[4],
             outputDirectory.c_str());
 
         singleRun(
             argc,
             argv,
-            0.0008f,
+            learningRate,
             seed,
+            layers,
             outputDirectory);
-        break;
+
+        return 0;
+    }
 
     case 1:
         statsRun(argc, argv);
-        break;
+        return 0;
 
     default:
-        fprintf(stderr, "Unknown mode: %d\n", mode);
+        fprintf(
+            stderr,
+            "Unknown mode: %d\n",
+            mode);
+
         return 1;
     }
-
-    return 0;
 }

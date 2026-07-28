@@ -7,10 +7,10 @@ const double fbgain = 300;
 const int nInputs = 30;
 
 // Number of layers of neurons in total
-static constexpr int nLayers = 3;
+// static constexpr int nLayers = 3;
 
 // The number of neurons in every layer
-const std::vector<int> nNeuronsInLayers = {9,6,6};
+// const std::vector<int> nNeuronsInLayers = {9,6,6};
 
 // We set nFilters in the input
 const int nFiltersInput = 10;
@@ -31,7 +31,7 @@ double	maxy = 300;
 #define STEPS_BELOW_ERR_THRESHOLD 1000
 
 // max number of steps to terminate
-#define MAX_STEPS 20000
+#define MAX_STEPS 200000
 
 // terminates if the agent won't turn after these steps
 #define STEPS_OFF_TRACK 1000
