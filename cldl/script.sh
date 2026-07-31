@@ -5,19 +5,19 @@ set -u
 # Seed and network structure can be supplied as command-line arguments.
 #
 # Usage:
-#   ./launch_fcl_parallel.sh [seed] [layers]
+#   ./launch_cldl_parallel.sh [seed] [layers]
 #
 # Example:
-#   ./launch_fcl_parallel.sh 42 9,6,6
+#   ./launch_cldl_parallel.sh 42 9,6,6
 
 SEED="${1:-42}"
 LAYERS="${2:-9,6,6}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SWEEP_SCRIPT="$SCRIPT_DIR/fcls.sh"
+SWEEP_SCRIPT="$SCRIPT_DIR/cldls.sh"
 
 if [[ ! -x "$SWEEP_SCRIPT" ]]; then
-    echo "Error: FCL sweep script is not executable:" >&2
+    echo "Error: CLDL sweep script is not executable:" >&2
     echo "  $SWEEP_SCRIPT" >&2
     echo "Run: chmod +x \"$SWEEP_SCRIPT\"" >&2
     exit 1
@@ -71,7 +71,7 @@ for ((i = 0; i < TERMINAL_COUNT; i++)); do
     START_LR="${START_RATES[$i]}"
     UPPER_LR="${UPPER_RATES[$i]}"
 
-    TITLE="FCL sweep ${TERMINAL_NUMBER}"
+    TITLE="CLDL sweep ${TERMINAL_NUMBER}"
 
     # printf %q safely quotes arguments for the new Bash process.
     COMMAND="$(

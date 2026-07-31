@@ -4,6 +4,12 @@
 #include "cldl_filterbank.h"
 #include <viewer/Viewer.h>
 
+#include <sstream>
+#include <vector>
+#include <cerrno>
+#include <climits>
+#include <cmath>
+
 #include <cstdlib>
 #include <string>
 
@@ -25,6 +31,8 @@ protected:
 	double* pred = NULL;
 	double* err = NULL;
 
+	int outputNeurons;
+
 	FILE* flog = NULL;
 
 	FILE* fcoord = NULL;
@@ -41,7 +49,7 @@ protected:
 	int trackCompletedCtr = 5000;
 		
 public:
-	LineFollower(World *world, QWidget *parent = 0, int seed = 42, const std::string& outputDir = ".") :
+	LineFollower(World *world, QWidget *parent, int seed, const std::vector<int>& layers, const std::string& outputDir = ".") :
 		ViewerWidget(world, parent), outputDirectory(outputDir) {
 
 		srand(static_cast<unsigned int>(seed));
@@ -70,17 +78,19 @@ public:
 		racer->rightSpeed = speed;
 		world->addObject(racer);
 
+		outputNeurons = static_cast<int>(layers.back());
+
 		pred = new double[nInputs];
-		err = new double[nNeuronsInLayers[2]];
+		err = new double[outputNeurons];
 
 		// setting up deep feedforward learning
 		cldl = new ClosedloopDeepLearningWithFilterbank(
 			nInputs,
-			nNeuronsInLayers.data(),
-			(int)nNeuronsInLayers.size(),
-			nFiltersInput,
-			minT,
-			maxT);
+    		layers.data(),
+    		static_cast<int>(layers.size()),
+    		nFiltersInput,
+    		minT,
+    		maxT);
 
 		cldl->initNetwork(CLDLNeuron::W_RANDOM_NORM, CLDLNeuron::B_NONE, CLDLNeuron::Act_Tanh);
 		cldl->setLearningRate(learningRate);
@@ -152,9 +162,9 @@ public:
 			//if (i>=racer->getNsensors()/2) fprintf(stderr,"%e ",pred[i]);
 		}
 		double error = (leftGround+leftGround2*2)-(rightGround+rightGround2*2);
-		for(int i=0;i<nNeuronsInLayers[2];i++) {
-			err[i] = error;
-                }
+		for (int i = 0; i < outputNeurons; i++) {
+    		err[i] = error;
+		}
 		// !!!!
 		cldl->doStep(pred,err);
 		float vL = (float)((cldl->getOutput(0))*50 +
@@ -192,6 +202,7 @@ public:
 		
 		fprintf(flog,"%e\t",error);
 		fprintf(flog,"%e\t",avgError);
+		fprintf(flog,"%e\t",absError);
 		fprintf(flog,"%e\t%e",vL,vR);
 		for(int i=0;i<cldl->getnLayers();i++) {
 			fprintf(flog,"\t%e",cldl->getLayer(i)->getWeightDistance());
@@ -215,8 +226,9 @@ public:
 
 void singleRun(int argc,
 	       char *argv[],
-	       float learningrate,
+	       double learningrate,
 		   int seed,
+		   const std::vector<int>& layers,
 		   const std::string& outputDirectory,
 	       FILE* f = NULL) {
 	QApplication app(argc, argv);
@@ -238,13 +250,20 @@ void singleRun(int argc,
     	&world,
     	nullptr,
     	seed,
+		layers,
     	outputDirectory);
 	linefollower.setLearningRate(learningrate);
 	linefollower.show();
 	app.exec();
 	fprintf(stderr,"Finished.\n");
 	if (f) {
-		fprintf(f,"%e %ld %e\n",learningrate,linefollower.getStep(),linefollower.getAvgError());
+		fprintf(
+			f,
+			"%e\t%d\t%ld\t%e\n",
+			learningrate,
+			seed,
+			linefollower.getStep(),
+			linefollower.getAvgError());
 	}
 }
 
@@ -252,56 +271,237 @@ void singleRun(int argc,
 void statsRun(int argc,
 	      char *argv[]) {
 	FILE* f = fopen("stats.dat","wt");
-	for(float learningRate = 0.00001f; learningRate < 0.1; learningRate = learningRate * 1.25f) {
+
+	fprintf(
+		f,
+		"learning_rate\tseed\tsteps\tavg_error\n");
+
+	const std::vector<int> defaultLayers = {
+		9,
+		6,
+		6
+	};
+
+	for(double learningRate = 0.00001f; learningRate < 0.1; learningRate = learningRate * 1.25f) {
 	//	srandom(1);
-		singleRun(argc,argv,learningRate,1,".",f);
+		singleRun(
+			argc,
+			argv,
+			learningRate,
+			1,
+			defaultLayers,
+			".",
+			f);
 		fflush(f);
 	//	srandom(42);
-		singleRun(argc,argv,learningRate,42,".",f);
+		singleRun(
+			argc,
+			argv,
+			learningRate,
+			42,
+			defaultLayers,
+			".",
+			f);
 		fflush(f);
 	}
 	fclose(f);
 }
 
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        fprintf(stderr,
-                "Single run: %s 0 [seed] [output_directory]\n",
-                argv[0]);
-        fprintf(stderr,
-                "Stats run: %s 1\n",
-                argv[0]);
-        return 0;
+bool parseLayerVector(
+    const std::string& text,
+    std::vector<int>& layers)
+{
+    layers.clear();
+
+    std::stringstream stream(text);
+    std::string token;
+
+    while (std::getline(stream, token, ',')) {
+        if (token.empty()) {
+            return false;
+        }
+
+        char* end = nullptr;
+        errno = 0;
+
+        const long value = std::strtol(
+            token.c_str(),
+            &end,
+            10);
+
+        if (errno != 0 ||
+            end == token.c_str() ||
+            *end != '\0' ||
+            value <= 0 ||
+            value > INT_MAX) {
+            return false;
+        }
+
+        layers.push_back(static_cast<int>(value));
     }
 
-    const int mode = atoi(argv[1]);
-
-    int seed = 42;
-    if (argc > 2) {
-        seed = atoi(argv[2]);
+    if (layers.empty()) {
+        return false;
     }
 
-    std::string outputDirectory = ".";
-    if (argc > 3) {
-        outputDirectory = argv[3];
-    }
-
-    switch (mode) {
-    case 0:
+    if (layers.back() != 6) {
         fprintf(
             stderr,
-            "Starting CLDL single run: seed=%d, output=%s\n",
-            seed,
-            outputDirectory.c_str());
+            "The output layer must contain exactly 6 neurons.\n");
 
-        singleRun(
-            argc,
-            argv,
-            0.0008f,
-            seed,
-            outputDirectory);
-        break;
+        return false;
+    }
+
+    return true;
+}
+
+bool parseDouble(
+    const char* text,
+    double& value)
+{
+    char* end = nullptr;
+    errno = 0;
+
+    value = std::strtod(text, &end);
+
+    if (errno != 0 ||
+        end == text ||
+        *end != '\0' ||
+        !std::isfinite(value)) {
+        return false;
+    }
+
+    return true;
+}
+
+bool parseInt(
+    const char* text,
+    int& value)
+{
+    char* end = nullptr;
+    errno = 0;
+
+    const long parsed = std::strtol(
+        text,
+        &end,
+        10);
+
+    if (errno != 0 ||
+        end == text ||
+        *end != '\0' ||
+        parsed < INT_MIN ||
+        parsed > INT_MAX) {
+        return false;
+    }
+
+    value = static_cast<int>(parsed);
+    return true;
+}
+
+
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+		fprintf(
+			stderr,
+			"Usage:\n"
+			"  Single run:\n"
+			"    %s 0 <learning_rate> <seed> <layers> "
+			"[output_directory]\n"
+			"\n"
+			"  Example:\n"
+			"    %s 0 0.0008 42 9,6,6 DataDL\n"
+			"\n"
+			"  Stats run:\n"
+			"    %s 1\n",
+			argv[0],
+			argv[0],
+			argv[0]);
+
+		return 1;
+	}
+
+	int mode = 0;
+
+	if (!parseInt(argv[1], mode)) {
+		fprintf(
+			stderr,
+			"Invalid mode: %s\n",
+			argv[1]);
+
+		return 1;
+	}
+
+    switch (mode) {
+    case 0: {
+    	if (argc < 5 || argc > 6) {
+        	fprintf(
+            	stderr,
+            	"Usage: %s 0 <learning_rate> <seed> "
+            	"<layers> [output_directory]\n",
+            	argv[0]);
+        	return 1;
+    	}
+
+    	double learningRate = 0.0;
+
+    	if (!parseDouble(argv[2], learningRate) ||
+        	learningRate <= 0.0) {
+        		fprintf(
+            	stderr,
+            	"Invalid learning rate: %s\n",
+            	argv[2]);
+        	return 1;
+    	}
+
+    	int seed = 0;
+
+    	if (!parseInt(argv[3], seed)) {
+        	fprintf(
+            	stderr,
+            	"Invalid seed: %s\n",
+            	argv[3]);
+        	return 1;
+    	}
+
+    	std::vector<int> layers;
+
+    	if (!parseLayerVector(argv[4], layers)) {
+        	fprintf(
+            	stderr,
+            	"Invalid layer vector: %s\n"
+            	"Expected format such as 9,6,6. "
+            	"The final layer must contain 6 neurons.\n",
+            	argv[4]);
+        	return 1;
+    	}
+
+    	const std::string outputDirectory =
+        	argc == 6 ? argv[5] : ".";
+
+    	fprintf(
+        	stderr,
+        	"Starting CLDL single run:\n"
+        	"  learning rate: %.17g\n"
+        	"  seed: %d\n"
+        	"  layers: %s\n"
+        	"  output: %s\n",
+        	learningRate,
+        	seed,
+        	argv[4],
+        	outputDirectory.c_str());
+
+    	singleRun(
+        	argc,
+        	argv,
+        	learningRate,
+        	seed,
+        	layers,
+        	outputDirectory);
+
+    	break;
+	}
 
     case 1:
         statsRun(argc, argv);
