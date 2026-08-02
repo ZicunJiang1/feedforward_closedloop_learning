@@ -119,7 +119,7 @@ if ! mkdir "$SWEEP_DIR"; then
     exit 1
 fi
 
-STATS_FILE="$SWEEP_DIR/stats_${TIMESTAMP}.tsv"
+STATS_FILE="$SWEEP_DIR/stats_${TIMESTAMP}.dat"
 
 printf \
     "learningrate\tsteps\tavg_error\tseed\tlayers\n" \
