@@ -1,69 +1,491 @@
-# Feedforward Closedloop Learning (FCL)
+# Oja-FCL vs CLDL Line-Following Experiments
 
-[Forward propagation closed loop learning
-Bernd Porr, Paul Miller. Adaptive Behaviour 2019.](https://journals.sagepub.com/doi/10.1177/1059712319851070)
+This branch extends the Oja-FCL line-following implementation into a controlled experimental framework for comparing **Oja-inspired Forward Propagation Closed-Loop Learning (Oja-FCL)** with **Closed-Loop Deep Learning (CLDL)**.
 
-[Submission version](https://www.berndporr.me.uk/Porr_Miller_FCL_2019_Adaptive_Behaviour.pdf)
+The main changes in this branch are experimental and structural rather than a redesign of the Oja-FCL learning rule. The line-following programs now accept experiment parameters from the command line, CLDL is available as a separate top-level target, and batch scripts are provided for large learning-rate sweeps.
 
-## Error _forward_ propagation
+---
 
-![alt tag](closed_loop.png)
+## 1. Main Changes
 
-For an autonomous agent, the inputs are the sensory data that inform the agent of the state of the world, and the outputs are their actions, which act on the world and consequently produce new sensory inputs. The agent only knows of its own actions via their effect on future inputs; therefore desired states, and error signals, are most naturally defined in terms of the inputs. Most machine learning algorithms, however, operate in terms of desired outputs. For example, backpropagation takes target output values and propagates the corresponding error backwards through the network in order to change the weights. In closed loop settings, it is far more obvious how to define desired sensory inputs than desired actions, however. To train a deep network using errors defined in the input space would call for an algorithm that can propagate those errors _forwards_ through the network, from input layer to output layer, in much the same way that activations are propagated.
+### 1.1 Command-line experiment parameters
 
-![alt tag](act_error_flow.png)
+Both the FCL and CLDL line-following programs can be run with parameters supplied from the command line.
 
-Comparison between FCL, backprop and ICO learning:
+The main configurable parameters are:
 
-![alt tag](learning_units_comparison.png)
+- learning rate;
+- random seed;
+- neural-network layer structure; and
+- output directory.
 
-## Prerequisites (Linux)
+The output layer must contain **6 neurons**, because the line-following steering interface uses three output neurons for the left wheel and three for the right wheel.
 
-Ubuntu LTS with swig installed.
+The two network structures used in the MSc project were:
 
-## How to compile / install?
-
-### From source under Linux (C++ and Python)
-```
-      cmake .
-      make
-      sudo make install
-      ./setup.py install --user
+```text
+9,6,6
+3,2,6
 ```
 
-### Windows
+With the 300 filtered predictive inputs, these correspond to:
 
-```
-cmake -G "Visual Studio 16 2019" -A x64 .
-```
-then start Visual Studio. See `cmake -G` for more target options.
-
-### From PyPi (Python only)
-
-https://pypi.org/project/feedforward_closedloop_learning/
-
-## Demos
-
-   * A classic line follower demo in `linefollower/` and
-   * our vizdoom demo where our FCL agent fights against another automated agent: https://github.com/glasgowneuro/fcl_doom
-
-## Class reference
-
-The online documentation can be found here: https://glasgowneuro.github.io/feedforward_closedloop_learning/
-
-The documentation is in the `docs` subdirectory in HTML, RTF and PDF.
-
-## License
-
-GNU GENERAL PUBLIC LICENSE
-
-Version 3, 29 June 2007
-
-```
-(C) 2017-2022, Bernd Porr <bernd@glasgowneuro.tech>
-(C) 2017,2018, Paul Miller <paul@glasgowneuro.tech>
+```text
+300-9-6-6
+300-3-2-6
 ```
 
-## DOI of the Code
+### FCL single-run interface
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7451257.svg)](https://doi.org/10.5281/zenodo.7451257)
+After compilation, an FCL run can be started using:
+
+```bash
+./build/linefollower/linefollower 0 <learning_rate> <seed> <layers> <output_directory>
+```
+
+Example:
+
+```bash
+./build/linefollower/linefollower 0 0.0008 42 9,6,6 DataFCL
+```
+
+### CLDL single-run interface
+
+The CLDL executable uses the corresponding parameterised interface:
+
+```bash
+./build/cldl/linefollowercldl 0 <learning_rate> <seed> <layers> <output_directory>
+```
+
+Example:
+
+```bash
+./build/cldl/linefollowercldl 0 0.0008 42 9,6,6 DataCLDL
+```
+
+Using the same seed, learning rate, network structure, robot environment and steering interface allows matched FCL/CLDL runs to be produced.
+
+---
+
+## 2. Batch Experiment Scripts
+
+Two levels of shell scripts are provided for each controller.
+
+### FCL
+
+```text
+linefollower/
+├── fcls.sh
+└── script.sh
+```
+
+### CLDL
+
+```text
+cldl/
+├── cldls.sh
+└── script.sh
+```
+
+### 2.1 `fcls.sh` and `cldls.sh`
+
+These scripts execute a learning-rate sweep over a specified interval.
+
+Their general interface is:
+
+```bash
+./fcls.sh <start_lr> <upper_lr> <seed> <layers> [output_directory]
+```
+
+and:
+
+```bash
+./cldls.sh <start_lr> <upper_lr> <seed> <layers> [output_directory]
+```
+
+Example:
+
+```bash
+cd linefollower
+./fcls.sh 0.0001 0.001 42 9,6,6
+```
+
+or:
+
+```bash
+cd cldl
+./cldls.sh 0.0001 0.001 42 9,6,6
+```
+
+The learning rate is multiplied by:
+
+```text
+1.25
+```
+
+after each run.
+
+Each run receives its own output directory. The scripts also produce a summary statistics file containing fields such as:
+
+```text
+learningrate
+steps
+avg_error
+seed
+layers
+```
+
+Detailed run directories contain the time-series files generated by the line follower, including files such as:
+
+```text
+flog.tsv
+coord.tsv
+program.log
+layer0.dat
+layer1.dat
+...
+```
+
+These files allow both run-level and time-series analysis.
+
+---
+
+### 2.2 `script.sh`: parallel full-range sweep
+
+The `script.sh` files are launcher scripts used to divide the complete learning-rate sweep into **10 ranges** and start them in separate GNOME Terminal windows.
+
+FCL:
+
+```bash
+cd linefollower
+./script.sh <seed> <layers>
+```
+
+CLDL:
+
+```bash
+cd cldl
+./script.sh <seed> <layers>
+```
+
+Examples:
+
+```bash
+cd linefollower
+./script.sh 42 9,6,6
+```
+
+```bash
+cd cldl
+./script.sh 42 9,6,6
+```
+
+If no parameters are supplied, the scripts default to:
+
+```text
+seed   = 42
+layers = 9,6,6
+```
+
+The complete sweep covers the learning-rate sequence beginning at:
+
+```text
+1.0e-5
+```
+
+with successive values multiplied by:
+
+```text
+1.25
+```
+
+and continues while the learning rate remains below:
+
+```text
+0.1
+```
+
+This produces the 42 learning-rate settings used in the project.
+
+The launcher requires:
+
+```text
+gnome-terminal
+```
+
+because each sub-range is executed in a separate terminal window.
+
+Before using the scripts, make them executable if required:
+
+```bash
+chmod +x linefollower/fcls.sh
+chmod +x linefollower/script.sh
+chmod +x cldl/cldls.sh
+chmod +x cldl/script.sh
+```
+
+---
+
+## 3. Experimental Configuration Used in the MSc Project
+
+The final experiment used:
+
+- 2 controllers:
+  - Oja-FCL
+  - CLDL
+- 2 network structures:
+  - `300-9-6-6`
+  - `300-3-2-6`
+- 2 random seeds:
+  - `1`
+  - `42`
+- 42 learning rates:
+  - starting at `1e-5`;
+  - multiplied by `1.25`;
+  - values executed while `< 0.1`.
+
+The complete experimental matrix therefore contains:
+
+```text
+2 controllers
+x 2 network structures
+x 2 seeds
+x 42 learning rates
+= 336 runs
+```
+
+Every run constructs a fresh controller. Learned weights and filter states are not intentionally carried from one learning-rate condition to the next.
+
+---
+
+# 4. Reproducing the Experiments
+
+The following procedure reproduces the experimental runs used to generate the project dataset.
+
+
+
+## Step 1: Install the required build environment
+
+The project is intended to be built under Linux. The line-following experiment requires the software used by the repository, including:
+
+- GCC/G++;
+- CMake;
+- Qt5;
+- OpenGL development libraries;
+- Enki/libenki;
+- SWIG where required by the original FCL project.
+
+The exact package names depend on the Linux distribution.
+
+The experiments for the MSc project were conducted using the C++ line-following programs rather than the Python interface.
+
+Make sure that Enki and the other repository dependencies are available before compiling.
+
+---
+
+## Step 2: Compile the project
+
+From the repository root:
+
+```bash
+chmod +x build.sh
+./build.sh
+```
+
+The build script creates the `build/` directory, compiles the project and copies the resources required by the line-following programs.
+
+The relevant executables should then be available at approximately:
+
+```text
+build/linefollower/linefollower
+build/cldl/linefollowercldl
+```
+
+Check that both exist:
+
+```bash
+ls -l build/linefollower/linefollower
+ls -l build/cldl/linefollowercldl
+```
+
+---
+
+## Step 3: Test one FCL run
+
+Before starting the full sweep, run one FCL configuration:
+
+```bash
+./build/linefollower/linefollower \
+    0 \
+    0.0001 \
+    42 \
+    9,6,6 \
+    TestFCL
+```
+
+The output directory should contain the generated log files.
+
+---
+
+## Step 4: Test one CLDL run
+
+Run the corresponding CLDL configuration:
+
+```bash
+./build/cldl/linefollowercldl \
+    0 \
+    0.0001 \
+    42 \
+    9,6,6 \
+    TestCLDL
+```
+
+Using the same learning rate, seed and layer structure provides a useful check that both controller targets can run under matched conditions.
+
+---
+
+# 5. Running the Complete Dataset Used in the Report
+
+The report used four controller/structure configurations, each tested with seeds 1 and 42.
+
+The simplest way to reproduce the full sweep is to use the parallel launcher scripts.
+
+## 5.1 Original Oja-FCL: 300-9-6-6
+
+Seed 1:
+
+```bash
+cd linefollower
+./script.sh 1 9,6,6
+```
+
+Seed 42:
+
+```bash
+./script.sh 42 9,6,6
+```
+
+---
+
+## 5.2 Reduced Oja-FCL: 300-3-2-6
+
+Seed 1:
+
+```bash
+./script.sh 1 3,2,6
+```
+
+Seed 42:
+
+```bash
+./script.sh 42 3,2,6
+```
+
+Return to the repository root afterwards:
+
+```bash
+cd ..
+```
+
+---
+
+## 5.3 Original CLDL: 300-9-6-6
+
+Seed 1:
+
+```bash
+cd cldl
+./script.sh 1 9,6,6
+```
+
+Seed 42:
+
+```bash
+./script.sh 42 9,6,6
+```
+
+---
+
+## 5.4 Reduced CLDL: 300-3-2-6
+
+Seed 1:
+
+```bash
+./script.sh 1 3,2,6
+```
+
+Seed 42:
+
+```bash
+./script.sh 42 3,2,6
+```
+
+These eight launcher commands cover:
+
+```text
+FCL / CLDL
+x original / reduced structure
+x seed 1 / seed 42
+```
+
+Each launcher divides its 42-learning-rate experiment into ten parallel sweep processes.
+
+> **Resource note:** each call to `script.sh` opens ten terminal windows and runs multiple graphical simulations. Run the controller/seed combinations one at a time unless the computer has sufficient CPU and memory resources.
+
+---
+
+# 6. Output Data
+
+By default, the FCL sweep scripts save their results under:
+
+```text
+linefollower/StatDataFcl/
+```
+
+The CLDL scripts use the corresponding CLDL output location defined by `cldls.sh`.
+
+Each parallel sweep creates unique timestamped directories so that concurrent processes do not overwrite one another.
+
+A typical structure is:
+
+```text
+StatDataFcl/
+└── sweep_<timestamp>_pid<id>/
+    ├── stats_<timestamp>.dat
+    ├── run_001_lr_<learning_rate>/
+    │   ├── flog.tsv
+    │   ├── coord.tsv
+    │   ├── program.log
+    │   └── layer*.dat
+    ├── run_002_lr_<learning_rate>/
+    └── ...
+```
+
+The most important files for the report are:
+
+### `stats_*.dat`
+
+Run-level summary data used to associate:
+
+```text
+learning rate
+steps
+average error
+seed
+network structure
+```
+
+### `flog.tsv`
+
+Time-series learning information for an individual run.
+
+This file is required for analyses based on the error trajectory rather than only the final run-level summary.
+
+### `coord.tsv`
+
+Robot-position data that can be used to inspect or visualise the simulated trajectory.
+
+### `program.log`
+
+Captured stdout/stderr for the individual run, useful for identifying termination behaviour and debugging failed runs.
+
