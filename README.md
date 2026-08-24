@@ -260,10 +260,6 @@ Every run constructs a fresh controller. Learned weights and filter states are n
 
 # 4. Reproducing the Experiments
 
-The following procedure reproduces the experimental runs used to generate the project dataset.
-
-
-
 ## Step 1: Install the required build environment
 
 The project is intended to be built under Linux. The line-following experiment requires the software used by the repository, including:
@@ -273,11 +269,7 @@ The project is intended to be built under Linux. The line-following experiment r
 - Qt5;
 - OpenGL development libraries;
 - Enki/libenki;
-- SWIG where required by the original FCL project.
-
-The exact package names depend on the Linux distribution.
-
-The experiments for the MSc project were conducted using the C++ line-following programs rather than the Python interface.
+- SWIG
 
 Make sure that Enki and the other repository dependencies are available before compiling.
 
@@ -315,7 +307,8 @@ ls -l build/cldl/linefollowercldl
 Before starting the full sweep, run one FCL configuration:
 
 ```bash
-./build/linefollower/linefollower \
+cd build/linefollower
+./linefollower \
     0 \
     0.0001 \
     42 \
@@ -332,7 +325,8 @@ The output directory should contain the generated log files.
 Run the corresponding CLDL configuration:
 
 ```bash
-./build/cldl/linefollowercldl \
+cd build/cldl
+./linefollowercldl \
     0 \
     0.0001 \
     42 \
