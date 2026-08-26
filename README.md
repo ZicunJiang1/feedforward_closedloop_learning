@@ -331,7 +331,6 @@ cd build/cldl
     0.0001 \
     42 \
     9,6,6 \
-    TestCLDL
 ```
 
 Using the same learning rate, seed and layer structure provides a useful check that both controller targets can run under matched conditions.
@@ -342,7 +341,7 @@ Using the same learning rate, seed and layer structure provides a useful check t
 
 The report used four controller/structure configurations, each tested with seeds 1 and 42.
 
-The simplest way to reproduce the full sweep is to use the parallel launcher scripts.
+The script is in cldl and linefollower folder rather than build folder.
 
 ## 5.1 Original Oja-FCL: 300-9-6-6
 
@@ -482,4 +481,38 @@ Robot-position data that can be used to inspect or visualise the simulated traje
 ### `program.log`
 
 Captured stdout/stderr for the individual run, useful for identifying termination behaviour and debugging failed runs.
+
+# 7. Plot Script
+'plot_stt_lr.py' is used to generate the graphs of steps to threshhold against learning_rates.
+Place the script directly inside the `data/` directory (depends on the output data directory such as StatDataFcl). Experimental data should be stored in subdirectories whose names begin with `sweep`, for example:
+
+- `data/plot_stt_lr.py`
+- `data/sweep_.../stats_....dat`
+
+The script automatically searches for `sweep*/stat*.tsv` and `sweep*/stat*.dat`. Each data file must be tab-separated and contain at least these columns:
+
+```text
+learningrate    steps    seed
+```
+
+## Usage
+
+Install Matplotlib:
+
+```bash
+python3 -m pip install matplotlib
+```
+
+Enter the `data/` directory and run the script:
+
+```bash
+cd data
+python3 plot_stt_lr.py
+```
+
+The following image will be created in the `data/` directory:
+
+```text
+steps_to_threshold.png
+```
 
